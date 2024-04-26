@@ -83,9 +83,9 @@ class AppService(AppServiceInterface, BaseService):
         while True:
             interval = 60
             for s in await self.get_service('data_svc').locate('schedules'):
-                now = datetime.now(timezone.utc).time()
-                today_utc = datetime.now(timezone.utc).date()
-                diff = datetime.combine(today_utc, now) - datetime.combine(today_utc, s.schedule)
+                now = datetime.now(timezone.utc)
+                cron = croniter.croniter(s.schedule, now)
+                diff = now - cron.get_prev(datetime)
                 if interval > diff.total_seconds() > 0:
                     self.log.debug('Pulling %s off the scheduler' % s.id)
                     sop = copy.deepcopy(s.task)
