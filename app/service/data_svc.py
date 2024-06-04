@@ -1,4 +1,3 @@
-import traceback
 import asyncio
 import copy
 import datetime
@@ -141,7 +140,6 @@ class DataService(DataServiceInterface, BaseService):
             return c_object.store(self.ram)
         except Exception as e:
             self.log.error('[!] can only store first-class objects: %s' % e)
-            print(traceback.format_exc())
 
     async def locate(self, object_name, match=None):
         try:
@@ -320,23 +318,18 @@ class DataService(DataServiceInterface, BaseService):
             await self.load_yaml_file(Adversary, filename, plugin.access)
 
     async def _load_abilities(self, plugin, tasks=None):
-        print(f'### _load_abilities for plugin {plugin.name} ###')
         tasks = [] if tasks is None else tasks
         for filename in glob.iglob('%s/abilities/**/*.yml' % plugin.data_dir, recursive=True):
             tasks.append(asyncio.get_event_loop().create_task(self.load_ability_file(filename, plugin.access)))
 
     @detection_plugin
     async def _load_connectors(self, plugin):
-        print(f'### _load_connectors for plugin {plugin.name} ###')
         for filename in glob.iglob('%s/connectors/*.yml' % plugin.data_dir, recursive=True):
-           print(f'\tfile: {filename}')
            await self.load_connector_file(filename, plugin.access)
 
     @detection_plugin
     async def _load_alert_association_rules(self, plugin):
-        print(f'### _load_alert_association_rules for plugin {plugin.name} ###')
         for filename in glob.iglob('%s/alert_association_rules/*.yml' % plugin.data_dir, recursive=True):
-           print(f'\tfile: {filename}')
            await self.load_alert_association_rule_file(filename, plugin.access)       
 
     @staticmethod
@@ -511,7 +504,6 @@ class DataService(DataServiceInterface, BaseService):
 
     @detection_plugin
     async def load_connector_file(self, filename, access):
-        print(f'### load_connector_file on {filename}')
         for entries in self.strip_yml(filename):
             for connector in entries:
                 connector_class = connector.pop('type')
@@ -520,14 +512,11 @@ class DataService(DataServiceInterface, BaseService):
 
     @detection_plugin
     async def _create_connector(self, connector_class, connector_id, **kwargs):
-        print('\t_create_connector')
         connector = getattr(connectors, connector_class)(connector_id=connector_id, **kwargs)
-        print(f'\tconnector: {connector}')
         return await self.store(connector)
 
     @detection_plugin
     async def load_alert_association_rule_file(self, filename, access):
-        print(f'### load_alert_association_rule_file on {filename}')
         for entries in self.strip_yml(filename):
             for rule in entries:
                 rule_id = rule.pop('id', None)
@@ -535,7 +524,5 @@ class DataService(DataServiceInterface, BaseService):
 
     @detection_plugin
     async def _create_alert_association_rule(self, rule_id, **kwargs):
-        print('\t_create_alert_association_rule')
         alert_association_rule = AlertAssociationRule (rule_id=rule_id, **kwargs)
-        print(f'\trule: {alert_association_rule}')
         return await self.store(alert_association_rule)
