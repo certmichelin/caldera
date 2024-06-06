@@ -21,6 +21,9 @@ from app.utility.base_service import BaseService
 Error = namedtuple('Error', ['name', 'msg', 'optional'])
 
 def detection_plugin(func):
+    """
+    TODO: may be used to nullify the function if the plugin is not enabled
+    """
     return func
 
 class AppService(AppServiceInterface, BaseService):
