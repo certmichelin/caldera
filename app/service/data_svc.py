@@ -23,7 +23,7 @@ from app.objects.secondclass.c_requirement import Requirement, RequirementSchema
 from app.service.interfaces.i_data_svc import DataServiceInterface
 from app.utility.base_service import BaseService
 
-# This should be conditional on the plugin being enabled
+# This should be conditional on the plugin being enabled / existing
 import plugins.detection.app.objects.c_connector as connectors 
 from plugins.detection.app.objects.c_alert_association_rule import AlertAssociationRule
 
