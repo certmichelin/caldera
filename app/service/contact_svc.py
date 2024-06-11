@@ -123,7 +123,7 @@ class ContactService(ContactServiceInterface, BaseService):
         for rule in alert_association_rules:
             connector = await self.get_service('data_svc').locate('connectors', match=dict(connector_id=rule.connector_id))
             if connector:
-                status = rule.check(connector, link, agent)
+                status = await rule.check(connector, link, agent)
         return status
     
     async def _save(self, result):
