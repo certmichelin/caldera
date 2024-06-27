@@ -66,6 +66,8 @@ class ContactService(ContactServiceInterface, BaseService):
             for result in results:
                 self.log.debug('Received result for link %s from agent %s via contact %s' % (result['id'], agent.paw,
                                                                                              agent.contact))
+                result.update(dict(status=self._handle_alert_association_rules(agent, result)))
+
                 await self._save(Result(**result))
                 operation = await self.get_service('app_svc').find_op_with_link(result['id'])
                 access = operation.access if operation else self.Access.RED
@@ -111,6 +113,19 @@ class ContactService(ContactServiceInterface, BaseService):
         """
         return re.sub(r'[^\w.\-]', '', input_paw)
 
+    async def _handle_alert_association_rules(self, agent, result):
+        """
+        Process any alert association rule that may correspond to the current link
+        """
+        link = await self.get_service('app_svc').find_link(result.id)
+        alert_association_rules = await self.get_service('data_svc').locate('alert_association_rules', match=dict(ability_id=link.ability.ability_id, os=agent.platform))
+        status = None
+        for rule in alert_association_rules:
+            connector = await self.get_service('data_svc').locate('connectors', match=dict(connector_id=rule.connector_id))
+            if connector:
+                status = await rule.check(connector, link, agent)
+        return status
+    
     async def _save(self, result):
         try:
             loop = asyncio.get_event_loop()

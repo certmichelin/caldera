@@ -23,6 +23,10 @@ from app.objects.secondclass.c_requirement import Requirement, RequirementSchema
 from app.service.interfaces.i_data_svc import DataServiceInterface
 from app.utility.base_service import BaseService
 
+# This should be conditional on the plugin being enabled / existing
+import plugins.detection.app.objects.c_connector as connectors 
+from plugins.detection.app.objects.c_alert_association_rule import AlertAssociationRule
+
 MIN_MODULE_LEN = 1
 
 DATA_BACKUP_DIR = "data/backup"
@@ -35,6 +39,8 @@ DATA_FILE_GLOBS = (
     'data/results/*',
     'data/sources/*',
     'data/object_store',
+    'data/connectors/*',
+    'data/alert_association_rules/*'
 )
 
 PAYLOADS_CONFIG_STANDARD_KEY = 'standard_payloads'
@@ -43,13 +49,19 @@ PAYLOADS_CONFIG_EXTENSIONS_KEY = 'extensions'
 
 DEPRECATION_WARNING_LOAD = "Function deprecated and will be removed in a future update. Use load_yaml_file"
 
+def detection_plugin(func):
+    """
+    TODO: may be used to nullify the function if the plugin is not enabled
+    """
+    return func
 
 class DataService(DataServiceInterface, BaseService):
 
     def __init__(self):
         self.log = self.add_service('data_svc', self)
         self.schema = dict(agents=[], planners=[], adversaries=[], abilities=[], sources=[], operations=[],
-                           schedules=[], plugins=[], obfuscators=[], objectives=[], data_encoders=[])
+                           schedules=[], plugins=[], obfuscators=[], objectives=[], data_encoders=[],
+                           connectors=[], alert_association_rules=[])
         self.ram = copy.deepcopy(self.schema)
 
     @staticmethod
@@ -294,6 +306,8 @@ class DataService(DataServiceInterface, BaseService):
                 await self._load_planners(plug)
                 await self._load_sources(plug)
                 await self._load_packers(plug)
+                await self._load_connectors(plug)
+                await self._load_alert_association_rules(plug)
             for task in async_tasks:
                 await task
             await self._load_extensions()
@@ -311,6 +325,16 @@ class DataService(DataServiceInterface, BaseService):
         tasks = [] if tasks is None else tasks
         for filename in glob.iglob('%s/abilities/**/*.yml' % plugin.data_dir, recursive=True):
             tasks.append(asyncio.get_event_loop().create_task(self.load_ability_file(filename, plugin.access)))
+
+    @detection_plugin
+    async def _load_connectors(self, plugin):
+        for filename in glob.iglob('%s/connectors/*.yml' % plugin.data_dir, recursive=True):
+           await self.load_connector_file(filename, plugin.access)
+
+    @detection_plugin
+    async def _load_alert_association_rules(self, plugin):
+        for filename in glob.iglob('%s/alert_association_rules/*.yml' % plugin.data_dir, recursive=True):
+           await self.load_alert_association_rule_file(filename, plugin.access)       
 
     @staticmethod
     async def _load_ability_requirements(requirements):
@@ -481,3 +505,28 @@ class DataService(DataServiceInterface, BaseService):
     def _get_plugin_name(self, filename):
         plugin_path = pathlib.PurePath(filename).parts
         return plugin_path[1] if 'plugins' in plugin_path else ''
+
+    @detection_plugin
+    async def load_connector_file(self, filename, access):
+        for entries in self.strip_yml(filename):
+            for connector in entries:
+                connector_class = connector.pop('type')
+                connector_id = connector.pop('id', None)
+                await self._create_connector(connector_class=connector_class, connector_id=connector_id, **connector)
+
+    @detection_plugin
+    async def _create_connector(self, connector_class, connector_id, **kwargs):
+        connector = getattr(connectors, connector_class)(connector_id=connector_id, **kwargs)
+        return await self.store(connector)
+
+    @detection_plugin
+    async def load_alert_association_rule_file(self, filename, access):
+        for entries in self.strip_yml(filename):
+            for rule in entries:
+                rule_id = rule.pop('id', None)
+                await self._create_alert_association_rule(rule_id=rule_id, **rule)
+
+    @detection_plugin
+    async def _create_alert_association_rule(self, rule_id, **kwargs):
+        alert_association_rule = AlertAssociationRule (rule_id=rule_id, **kwargs)
+        return await self.store(alert_association_rule)
